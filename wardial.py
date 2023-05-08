@@ -206,8 +206,8 @@ async def _wardial_async(hosts, max_connections=500, timeout=10, schema='http'):
         # Modify the code to use the `asyncio.gather` function to enable concurrency.
         results = []
         for host in hosts:
-            results.append(await is_server_at_host(session,host))
-        return results
+            results.append(is_server_at_host(session,host))
+        return asyncio.gather(*results)
 
 
 def wardial(hosts, **kwargs):
@@ -227,7 +227,15 @@ def wardial(hosts, **kwargs):
     # and use this event loop to call the `_wardial_async` function.
     # Ensure that all of the kwargs parameters get passed to `_wardial_async`.
     # You will have to do some post-processing of the results of this function to convert the output.
-    return []
+    hosts_list = []
+    loop = asyncio.new_event_loop()
+    xs = loop.run_until_complete(_wardial_async(hosts, **kwargs))
+    for host, x in enumerate(xs):
+        if x:
+            hosts_list.append(hosts[host])
+    loop.close()
+    return hosts_list
+
 
 if __name__=='__main__':
 
@@ -252,5 +260,7 @@ if __name__=='__main__':
 
     # run the wardial
     ips = netmask_to_ips(args.netmask)
-    alive_ips = wardial(ips, timeout=args.timeout, max_connections=args.max_connections, schema=args.schema)
+    alive_ips = wardial(ips, timeout=args.timeout,
+                        max_connections=args.max_connections,
+                        schema=args.schema)
     print('total ips found =', len(alive_ips))
